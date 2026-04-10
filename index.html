@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sweet Katie's Treats</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Outfit:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink:   #f4849c;
+      --purple: #e8a0b0;
+      --peach:  #f9c0c0;
+      --blue:   #f4849c;
+      --yellow: #f7d6a0;
+      --dark:   #1a0a0e;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #1a0a0e;
+      color: #fff;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* ── CANVAS (handles everything: blobs, particles, cursor trail) ── */
+    #bg-canvas {
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    /* ── CURSOR ── */
+    #cursor {
+      position: fixed; z-index: 9999; pointer-events: none;
+      width: 10px; height: 10px;
+      background: var(--pink);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      will-change: left, top;
+    }
+    #cursor-ring {
+      position: fixed; z-index: 9998; pointer-events: none;
+      width: 36px; height: 36px;
+      border: 1.5px solid rgba(255,79,154,.45);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      will-change: left, top;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.2rem 3.5rem;
+      transition: background .4s;
+    }
+    nav.scrolled {
+      background: rgba(14,6,21,.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,79,154,.1);
+    }
+    .nav-logo {
+      text-decoration: none;
+      display: flex; align-items: center;
+    }
+    .nav-logo img {
+      height: 52px;
+      width: auto;
+      object-fit: contain;
+    }
+    .nav-links { display: flex; gap: 2.2rem; list-style: none; }
+    .nav-links a {
+      text-decoration: none; color: rgba(255,255,255,.55);
+      font-size: .82rem; font-weight: 500; letter-spacing: .1em;
+      text-transform: uppercase; transition: color .2s;
+      position: relative;
+    }
+    .nav-links a::after {
+      content: ''; position: absolute; bottom: -.3rem; left: 0; right: 0;
+      height: 1px; background: var(--pink);
+      transform: scaleX(0); transition: transform .3s;
+    }
+    .nav-links a:hover { color: #fff; }
+    .nav-links a:hover::after { transform: scaleX(1); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      color: #fff; border: none; padding: .55rem 1.5rem; border-radius: 50px;
+      font-family: 'Outfit', sans-serif; font-size: .82rem; font-weight: 700;
+      letter-spacing: .06em; cursor: none;
+      transition: transform .2s, opacity .2s;
+    }
+    .nav-cta:hover { transform: scale(1.05); opacity: .9; }
+
+    /* ── HERO ── */
+    #hero {
+      position: relative; z-index: 2;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 6rem 2rem 4rem;
+      overflow: hidden;
+    }
+    .hero-content {
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .hero-logo {
+      height: 240px; width: auto; object-fit: contain;
+      border-radius: 20px;
+      margin-bottom: 1.2rem;
+    }
+
+    /* ── SIDE ROSES ── */
+    .rose-side {
+      position: absolute; top: 0; bottom: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2.5rem; pointer-events: none; z-index: 1;
+    }
+    .rose-side.left  { left: 2rem; }
+    .rose-side.right { right: 2rem; }
+    .rose {
+      font-size: 2.2rem; opacity: .55;
+      will-change: transform;
+    }
+    .rose:nth-child(1) { animation: roseSway 4.0s ease-in-out infinite; }
+    .rose:nth-child(2) { animation: roseSway 5.2s ease-in-out infinite reverse; font-size: 1.6rem; opacity: .35; }
+    .rose:nth-child(3) { animation: roseSway 3.6s ease-in-out infinite; font-size: 2.6rem; opacity: .5; }
+    .rose:nth-child(4) { animation: roseSway 4.8s ease-in-out infinite reverse; font-size: 1.4rem; opacity: .3; }
+    .rose:nth-child(5) { animation: roseSway 5.5s ease-in-out infinite; font-size: 1.9rem; opacity: .4; }
+    @keyframes roseSway {
+      0%,100% { transform: translateY(0) rotate(-8deg); }
+      50%      { transform: translateY(-14px) rotate(8deg); }
+    }
+    @media (max-width: 900px) {
+      .rose-side { display: none; }
+    }
+    .hero-badge {
+      display: inline-block;
+      border: 1px solid rgba(255,79,154,.35);
+      background: rgba(255,79,154,.08);
+      color: var(--pink); font-size: .72rem; font-weight: 700;
+      letter-spacing: .18em; text-transform: uppercase;
+      padding: .4rem 1.2rem; border-radius: 50px; margin-bottom: 1.8rem;
+      /* simple opacity pulse — no box-shadow animation */
+      animation: opacityPulse 3s ease infinite;
+    }
+    @keyframes opacityPulse { 0%,100%{opacity:1;} 50%{opacity:.6;} }
+
+    .hero-title {
+      font-family: 'Dancing Script', cursive;
+      font-size: clamp(4rem, 11vw, 9rem);
+      line-height: 1; margin-bottom: 1rem;
+    }
+    .hero-title .line1 {
+      display: block;
+      background: linear-gradient(135deg, #fff 0%, #ffd6e8 60%, var(--pink) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-size: 200% 200%;
+      animation: gradShift 5s ease infinite;
+    }
+    .hero-title .line2 {
+      display: block;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--pink) 50%, var(--peach) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-size: 200% 200%;
+      animation: gradShift 5s ease infinite reverse;
+    }
+    @keyframes gradShift {
+      0%,100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.2rem);
+      color: rgba(255,255,255,.45); font-weight: 300;
+      max-width: 500px; margin: 0 auto 2.8rem; line-height: 1.7;
+    }
+    #typewriter { color: var(--pink); font-weight: 600; }
+    .hero-ctas { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-glow {
+      padding: .9rem 2.4rem; border-radius: 50px; font-size: .95rem; font-weight: 700;
+      text-decoration: none; display: inline-block; letter-spacing: .04em;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      color: #fff;
+      transition: transform .2s, opacity .2s;
+    }
+    .btn-glow:hover { transform: translateY(-3px); opacity: .9; }
+    .btn-ghost {
+      padding: .88rem 2.4rem; border-radius: 50px; font-size: .95rem; font-weight: 700;
+      border: 1.5px solid rgba(255,79,154,.4); color: var(--pink); background: transparent;
+      text-decoration: none; display: inline-block;
+      transition: background .2s, border-color .2s, transform .2s;
+    }
+    .btn-ghost:hover { background: rgba(255,79,154,.1); border-color: var(--pink); transform: translateY(-3px); }
+    .hero-scroll-hint {
+      position: absolute; bottom: -3rem; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: .4rem;
+      color: rgba(255,255,255,.2); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase;
+    }
+    .scroll-line {
+      width: 1px; height: 50px;
+      background: linear-gradient(to bottom, rgba(255,79,154,.5), transparent);
+      animation: scrollPulse 2s ease infinite;
+    }
+    @keyframes scrollPulse { 0%,100%{opacity:.5;} 50%{opacity:1;} }
+
+    /* ── MARQUEE ── */
+    .marquee-wrap {
+      position: relative; z-index: 2; overflow: hidden; padding: 1rem 0;
+      border-top: 1px solid rgba(255,79,154,.1);
+      border-bottom: 1px solid rgba(255,79,154,.1);
+      background: rgba(255,79,154,.04);
+    }
+    .marquee-track {
+      display: flex; white-space: nowrap;
+      animation: marquee 18s linear infinite;
+    }
+    .marquee-track span {
+      padding: 0 2rem; font-size: .8rem; font-weight: 600;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(255,255,255,.35); flex-shrink: 0;
+    }
+    .marquee-track .sep { color: var(--pink); opacity: .4; }
+    @keyframes marquee { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+
+    /* ── SECTIONS ── */
+    section { position: relative; z-index: 2; padding: 7rem 3rem; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .s-label {
+      font-size: .68rem; font-weight: 700; letter-spacing: .22em;
+      text-transform: uppercase; color: var(--pink);
+      display: flex; align-items: center; gap: .8rem; margin-bottom: 1rem;
+    }
+    .s-label::before, .s-label::after { content: '✦'; font-size: .5rem; color: var(--purple); }
+    .s-title {
+      font-family: 'Dancing Script', cursive;
+      font-size: clamp(2.8rem, 5vw, 4.5rem);
+      line-height: 1.1; margin-bottom: 1rem;
+      background: linear-gradient(135deg, #fff, #ffd6e8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .s-sub { font-size: 1rem; color: rgba(255,255,255,.4); line-height: 1.7; font-weight: 300; }
+
+    /* ── ABOUT ── */
+    .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+    .about-vis {
+      position: relative; height: 420px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    /* Morphing blobs — opacity/border-radius only, no filter */
+    .morph-blob {
+      position: absolute;
+      width: 300px; height: 300px;
+      background: linear-gradient(135deg, rgba(255,79,154,.22), rgba(181,111,255,.18));
+      border-radius: 60% 40% 70% 30% / 50% 60% 40% 50%;
+      animation: morph 9s ease infinite, blobSpin 22s linear infinite;
+      will-change: transform, border-radius;
+    }
+    .morph-blob2 {
+      width: 240px; height: 240px;
+      background: linear-gradient(135deg, rgba(181,111,255,.15), rgba(79,195,247,.12));
+      border-radius: 40% 60% 30% 70% / 60% 40% 50% 40%;
+      animation: morph2 11s ease infinite reverse, blobSpin 16s linear infinite reverse;
+    }
+    @keyframes morph {
+      0%,100% { border-radius: 60% 40% 70% 30% / 50% 60% 40% 50%; }
+      25%      { border-radius: 30% 70% 40% 60% / 40% 50% 60% 50%; }
+      50%      { border-radius: 50% 50% 60% 40% / 70% 30% 50% 50%; }
+      75%      { border-radius: 70% 30% 50% 50% / 30% 60% 40% 60%; }
+    }
+    @keyframes morph2 {
+      0%,100% { border-radius: 40% 60% 30% 70% / 60% 40% 50% 40%; }
+      33%      { border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%; }
+      66%      { border-radius: 30% 70% 70% 30% / 50% 50% 40% 60%; }
+    }
+    @keyframes blobSpin { to { transform: rotate(360deg); } }
+    .about-center-icon {
+      position: relative; z-index: 2; font-size: 5rem;
+      animation: iconFloat 4s ease infinite;
+      will-change: transform;
+    }
+    @keyframes iconFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-14px);} }
+    /* Orbit rings */
+    .orbit {
+      position: absolute; width: 370px; height: 370px;
+      border: 1px dashed rgba(255,79,154,.14);
+      border-radius: 50%;
+      animation: orbitSpin 14s linear infinite;
+      will-change: transform;
+    }
+    .orbit2 {
+      width: 450px; height: 450px;
+      border-color: rgba(181,111,255,.09);
+      animation-duration: 22s;
+      animation-direction: reverse;
+    }
+    .orbit-dot {
+      position: absolute; top: -5px; left: 50%;
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--pink); transform: translateX(-50%);
+    }
+    .orbit-dot2 { background: var(--purple); }
+    @keyframes orbitSpin { to { transform: rotate(360deg); } }
+
+    .about-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.5rem; }
+    .stat-box {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px; padding: 1.4rem;
+      transition: background .25s, border-color .25s, transform .25s;
+      will-change: transform;
+    }
+    .stat-box:hover { background: rgba(255,79,154,.08); border-color: rgba(255,79,154,.25); transform: translateY(-4px); }
+    .stat-num {
+      font-family: 'Dancing Script', cursive; font-size: 2.8rem; line-height: 1;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .stat-lbl { font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-top: .3rem; }
+
+    /* ── MENU ── */
+    .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3rem; }
+    .menu-card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 24px; padding: 2.2rem;
+      transition: transform .25s, background .25s, border-color .25s;
+      will-change: transform;
+      transform-style: preserve-3d;
+    }
+    .menu-card:hover { background: rgba(255,79,154,.07); border-color: rgba(255,79,154,.25); }
+    .menu-card-icon {
+      font-size: 2.8rem; margin-bottom: 1.2rem; display: block;
+      animation: iconBounce 3s ease infinite;
+      will-change: transform;
+    }
+    .menu-card:nth-child(2)  .menu-card-icon { animation-delay: .3s; }
+    .menu-card:nth-child(3)  .menu-card-icon { animation-delay: .6s; }
+    .menu-card:nth-child(4)  .menu-card-icon { animation-delay: .9s; }
+    .menu-card:nth-child(5)  .menu-card-icon { animation-delay: 1.2s; }
+    .menu-card:nth-child(6)  .menu-card-icon { animation-delay: 1.5s; }
+    .menu-card:nth-child(7)  .menu-card-icon { animation-delay: 1.8s; }
+    .menu-card:nth-child(8)  .menu-card-icon { animation-delay: 2.1s; }
+    .menu-card:nth-child(9)  .menu-card-icon { animation-delay: 2.4s; }
+    .menu-card:nth-child(10) .menu-card-icon { animation-delay: 2.7s; }
+    .menu-card:nth-child(11) .menu-card-icon { animation-delay: 3.0s; }
+    @keyframes iconBounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-7px);} }
+    .menu-card-name { font-family: 'Dancing Script', cursive; font-size: 1.7rem; color: #fff; margin-bottom: .4rem; }
+    .menu-card-sub { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--pink); margin-bottom: .8rem; }
+    .menu-card-desc { font-size: .88rem; color: rgba(255,255,255,.4); line-height: 1.65; font-weight: 300; }
+    .menu-price {
+      display: inline-block; margin-top: 1.2rem;
+      font-family: 'Dancing Script', cursive; font-size: 1.6rem;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* ── SPECIALTY ── */
+    .spec-ring-wrap { position: relative; width: 380px; height: 380px; margin: 3rem auto; }
+    .spec-ring {
+      position: absolute; inset: 0; border-radius: 50%;
+      animation: orbitSpin linear infinite;
+      will-change: transform;
+    }
+    .spec-ring:nth-child(1) { border: 2px solid rgba(255,79,154,.3); animation-duration: 9s; }
+    .spec-ring:nth-child(2) { inset: 20px; border: 1px solid rgba(181,111,255,.2); animation-duration: 13s; animation-direction: reverse; }
+    .spec-ring:nth-child(3) { inset: 40px; border: 1px dashed rgba(79,195,247,.15); animation-duration: 18s; }
+    .spec-ring-dot {
+      position: absolute; width: 11px; height: 11px; border-radius: 50%;
+      top: -5px; left: 50%; transform: translateX(-50%);
+    }
+    .spec-ring:nth-child(1) .spec-ring-dot { background: var(--pink); }
+    .spec-ring:nth-child(2) .spec-ring-dot { background: var(--purple); }
+    .spec-ring:nth-child(3) .spec-ring-dot { background: var(--blue); }
+    .spec-center {
+      position: absolute; inset: 60px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,79,154,.12), rgba(181,111,255,.07));
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      animation: opacityPulse 4s ease infinite;
+    }
+    .spec-center-icon { font-size: 3.5rem; animation: iconFloat 4s ease infinite; will-change: transform; }
+    .spec-center-text { font-family: 'Dancing Script', cursive; font-size: 1rem; color: var(--pink); margin-top: .3rem; }
+    .spec-features { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
+    .spec-feat {
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px; padding: 1.5rem 2rem; text-align: center; min-width: 160px;
+      transition: transform .3s, border-color .3s;
+      will-change: transform;
+    }
+    .spec-feat:hover { transform: translateY(-5px); border-color: rgba(255,79,154,.25); }
+    .spec-feat .ico { font-size: 2rem; display: block; margin-bottom: .6rem; }
+    .spec-feat h3 { font-size: .95rem; font-weight: 700; margin-bottom: .3rem; }
+    .spec-feat p { font-size: .82rem; color: rgba(255,255,255,.35); line-height: 1.5; max-width: 160px; }
+
+    /* ── TESTIMONIALS ── */
+    .testi-track-wrap { overflow: hidden; margin-top: 3rem; }
+    .testi-track {
+      display: flex; gap: 1.5rem; width: max-content;
+      animation: marquee 22s linear infinite;
+      will-change: transform;
+    }
+    .testi-track:hover { animation-play-state: paused; }
+    .testi-card {
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 20px; padding: 2rem; width: 300px; flex-shrink: 0; text-align: left;
+      transition: border-color .3s;
+    }
+    .testi-card:hover { border-color: rgba(255,79,154,.3); }
+    .testi-stars { color: var(--yellow); font-size: .9rem; margin-bottom: 1rem; }
+    .testi-text { font-size: .9rem; color: rgba(255,255,255,.6); line-height: 1.7; font-style: italic; margin-bottom: 1.2rem; }
+    .testi-author { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--pink); }
+
+    /* ── CONTACT ── */
+    .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: start; }
+    .hours-grid { display: flex; flex-direction: column; gap: .5rem; margin-top: 1.8rem; }
+    .hours-row { display: flex; justify-content: space-between; padding: .8rem 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: .92rem; }
+    .hours-row .day { color: rgba(255,255,255,.35); font-weight: 300; }
+    .hours-row .time { color: #fff; font-weight: 500; }
+    .contact-info-items { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.8rem; }
+    .c-item { display: flex; gap: 1rem; align-items: center; }
+    .c-icon {
+      width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+      background: rgba(255,79,154,.1); border: 1px solid rgba(255,79,154,.2);
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+      transition: background .2s;
+    }
+    .c-item:hover .c-icon { background: rgba(255,79,154,.2); }
+    .c-item p { font-size: .92rem; color: rgba(255,255,255,.6); }
+    .contact-form { display: flex; flex-direction: column; gap: 1rem; }
+    .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .f-group { display: flex; flex-direction: column; gap: .4rem; }
+    .f-group label { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.3); }
+    .f-group input, .f-group textarea, .f-group select {
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+      color: #fff; padding: .75rem 1rem; border-radius: 12px;
+      font-family: 'Outfit', sans-serif; font-size: .9rem; outline: none;
+      transition: border-color .2s, background .2s;
+    }
+    .f-group input:focus, .f-group textarea:focus { border-color: rgba(255,79,154,.5); background: rgba(255,79,154,.05); }
+    .f-group textarea { resize: vertical; min-height: 110px; }
+    .f-group input::placeholder, .f-group textarea::placeholder { color: rgba(255,255,255,.2); }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative; z-index: 2; padding: 3rem;
+      border-top: 1px solid rgba(255,79,154,.1);
+      background: rgba(14,6,21,.7);
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;
+    }
+    .footer-logo {
+      font-family: 'Dancing Script', cursive; font-size: 1.5rem;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .footer-links { display: flex; gap: 1.8rem; }
+    .footer-links a { color: rgba(255,255,255,.3); text-decoration: none; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; transition: color .2s; }
+    .footer-links a:hover { color: var(--pink); }
+    .footer-copy { font-size: .75rem; color: rgba(255,255,255,.15); }
+
+    /* ── REVEAL ── */
+    .reveal, .reveal-scale {
+      opacity: 0; transition: opacity .7s ease, transform .7s ease;
+    }
+    .reveal { transform: translateY(30px); }
+    .reveal-scale { transform: scale(.93); }
+    .reveal.vis, .reveal-scale.vis { opacity: 1; transform: none; }
+
+    @media (max-width: 900px) {
+      nav { padding: 1rem 1.5rem; }
+      section { padding: 5rem 1.5rem; }
+      .about-grid, .contact-grid { grid-template-columns: 1fr; }
+      .menu-grid { grid-template-columns: 1fr 1fr; }
+      .nav-links { display: none; }
+      footer { flex-direction: column; text-align: center; }
+      .footer-links { flex-wrap: wrap; justify-content: center; }
+    }
+    @media (max-width: 600px) {
+      .menu-grid { grid-template-columns: 1fr; }
+      .f-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="#hero" class="nav-logo"><img src="logo.jpg" alt="Sweet Katie's Treats" /></a>
+  <ul class="nav-links">
+    <li><a href="#about">Our Story</a></li>
+    <li><a href="#menu">Menu</a></li>
+    <li><a href="#specialty">Why Us</a></li>
+    <li><a href="#testimonials">Reviews</a></li>
+    <li><a href="#contact">Visit</a></li>
+  </ul>
+  <a href="https://sweet-katies-treats.square.site/" target="_blank" class="nav-cta" style="text-decoration:none;">Order Now 🍰</a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <!-- Left roses -->
+  <div class="rose-side left">
+    <span class="rose">🌸</span>
+    <span class="rose">🌹</span>
+    <span class="rose">🌺</span>
+    <span class="rose">🌸</span>
+    <span class="rose">🌷</span>
+  </div>
+
+  <div class="hero-content reveal">
+    <div class="hero-badge">🍰 Baked Fresh Every Morning</div>
+    <img src="logo.jpg" alt="Sweet Katie's Treats" class="hero-logo" />
+    <p class="hero-sub">Where every bite feels like home.<br /><span id="typewriter"></span></p>
+    <div class="hero-ctas">
+      <a href="#menu" class="btn-glow">Browse Menu</a>
+      <a href="https://sweet-katies-treats.square.site/" target="_blank" class="btn-ghost">Make an Order</a>
+    </div>
+    <div class="hero-scroll-hint">
+      <span>Scroll</span>
+      <div class="scroll-line"></div>
+    </div>
+  </div>
+
+  <!-- Right roses -->
+  <div class="rose-side right">
+    <span class="rose">🌷</span>
+    <span class="rose">🌺</span>
+    <span class="rose">🌸</span>
+    <span class="rose">🌹</span>
+    <span class="rose">🌸</span>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-track">
+    <span>🎂 Custom Cakes</span><span class="sep">✦</span><span>🍫 Brownies</span><span class="sep">✦</span><span>🧁 Specialty Cupcakes</span><span class="sep">✦</span><span>🍪 Classic Cookies</span><span class="sep">✦</span><span>🍌 Banana Bread</span><span class="sep">✦</span><span>🌀 Cinnamon Rolls</span><span class="sep">✦</span><span>🍭 Cake Pops</span><span class="sep">✦</span><span>🎃 Pumpkin Roll</span><span class="sep">✦</span><span>🥖 Sourdough</span><span class="sep">✦</span>
+    <span>🎂 Custom Cakes</span><span class="sep">✦</span><span>🍫 Brownies</span><span class="sep">✦</span><span>🧁 Specialty Cupcakes</span><span class="sep">✦</span><span>🍪 Classic Cookies</span><span class="sep">✦</span><span>🍌 Banana Bread</span><span class="sep">✦</span><span>🌀 Cinnamon Rolls</span><span class="sep">✦</span><span>🍭 Cake Pops</span><span class="sep">✦</span><span>🎃 Pumpkin Roll</span><span class="sep">✦</span><span>🥖 Sourdough</span><span class="sep">✦</span>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-vis reveal-scale">
+        <div class="orbit"><div class="orbit-dot"></div></div>
+        <div class="orbit orbit2"><div class="orbit-dot orbit-dot2"></div></div>
+        <div class="morph-blob"></div>
+        <div class="morph-blob morph-blob2"></div>
+        <div class="about-center-icon">🎂</div>
+      </div>
+      <div class="reveal">
+        <div class="s-label">Our Story</div>
+        <h2 class="s-title">Where Every Bite<br />Feels Like Home</h2>
+        <p class="s-sub">Step into a world of freshly baked magic, right from the comfort of your own home. We handcraft each treat with love, using the finest ingredients and a sprinkle of joy in every batch — from melt-in-your-mouth cookies and decadent cakes to warm, crusty breads and buttery pastries.</p>
+        <div class="about-stats">
+          <div class="stat-box"><div class="stat-num" data-target="4">0</div><div class="stat-lbl">Years of Baking</div></div>
+          <div class="stat-box"><div class="stat-num" data-target="60">0</div><div class="stat-lbl">Recipes Perfected</div></div>
+          <div class="stat-box"><div class="stat-num" data-target="100">0</div><div class="stat-lbl">Happy Customers</div></div>
+          <div class="stat-box"><div class="stat-num" data-target="100">0</div><div class="stat-lbl">% Scratch Made</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MENU -->
+<section id="menu">
+  <div class="container">
+    <div style="text-align:center" class="reveal">
+      <div class="s-label" style="justify-content:center">Daily Favorites</div>
+      <h2 class="s-title">The Menu</h2>
+      <p class="s-sub" style="max-width:480px;margin:0 auto">Fresh every morning, gone by afternoon.</p>
+    </div>
+    <div class="menu-grid">
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🎂</span>
+        <div class="menu-card-name">Whole Cakes</div>
+        <div class="menu-card-sub">Cakes · Custom</div>
+        <div class="menu-card-desc">Custom cakes baked in small batches for maximum freshness. Moist layers, rich fillings, and smooth frosting — elegant simplicity or a themed showstopper. Prices may vary by design.</div>
+        <div class="menu-price">$55 – $60</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🍫</span>
+        <div class="menu-card-name">Brownie</div>
+        <div class="menu-card-sub">Brownies · ½ doz min</div>
+        <div class="menu-card-desc">Rich, fudgy brownies baked from scratch with real butter and premium cocoa. Dense, moist, and packed with deep chocolate flavor.</div>
+        <div class="menu-price">$5.00 ea</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🧁</span>
+        <div class="menu-card-name">Specialty Cupcakes</div>
+        <div class="menu-card-sub">Cupcakes · 1 dozen</div>
+        <div class="menu-card-desc">Soft, tender cupcakes finished with a swirl of creamy frosting, made from scratch with quality ingredients and decorated with elegant charm.</div>
+        <div class="menu-price">$42 / dzn</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🎀</span>
+        <div class="menu-card-name">Standard Cupcakes</div>
+        <div class="menu-card-sub">Cupcakes · 1 doz min</div>
+        <div class="menu-card-desc">Classic homemade cupcakes with a soft crumb and creamy frosting swirl. Simple, delicious, and made from scratch every time.</div>
+        <div class="menu-price">$30 / dzn</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🍪</span>
+        <div class="menu-card-name">Classic Cookies</div>
+        <div class="menu-card-sub">Cookies · 1 doz min</div>
+        <div class="menu-card-desc">Soft, chewy cookies baked from scratch. Perfectly golden edges, a tender center, and that nostalgic homemade flavor in every bite.</div>
+        <div class="menu-price">$48 / dzn &nbsp;·&nbsp; $3.75 ea</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">⭐</span>
+        <div class="menu-card-name">Specialty Cookies</div>
+        <div class="menu-card-sub">Cookies · 1 doz min</div>
+        <div class="menu-card-desc">Elevated ingredients and creative mix-ins. Soft, chewy centers and decadent flavors — a standout treat for any cookie lover.</div>
+        <div class="menu-price">$60 / dzn &nbsp;·&nbsp; $4.75 ea</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🍌</span>
+        <div class="menu-card-name">Banana Bread</div>
+        <div class="menu-card-sub">Sweet Loaves</div>
+        <div class="menu-card-desc">Moist, tender banana bread baked with ripe bananas and warm vanilla. Perfectly sweet with a soft crumb — just like home.</div>
+        <div class="menu-price">$5 – $15</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🌀</span>
+        <div class="menu-card-name">Cinnamon Rolls</div>
+        <div class="menu-card-sub">Sweet Loaves · 6-pack</div>
+        <div class="menu-card-desc">Pillowy cinnamon rolls packed with buttery cinnamon filling, topped with creamy vanilla icing. Perfectly sweet, perfectly soft, irresistibly cozy.</div>
+        <div class="menu-price">$20 / 6-pack</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🍭</span>
+        <div class="menu-card-name">Cake Pops</div>
+        <div class="menu-card-sub">Cake Pops · 1 doz min</div>
+        <div class="menu-card-desc">Rich, moist cake shaped into a bite-sized treat and dipped in smooth chocolate. Fun to eat and full of homemade sweetness. Price may vary by design.</div>
+        <div class="menu-price">$40 / dzn</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🎃</span>
+        <div class="menu-card-name">Pumpkin Roll</div>
+        <div class="menu-card-sub">Seasonal</div>
+        <div class="menu-card-desc">Pumpkin cake infused with cinnamon, nutmeg, and cloves, spread with rich cream cheese frosting and rolled to perfection. Cozy fall flavor in every slice.</div>
+        <div class="menu-price">$5 – $18</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🥯</span>
+        <div class="menu-card-name">Sourdough Bagels</div>
+        <div class="menu-card-sub">Sourdough · ½ dozen</div>
+        <div class="menu-card-desc">Freshly baked sourdough bagels with a chewy crust and soft, airy interior. Made from scratch with a long-fermented sourdough base.</div>
+        <div class="menu-price">$18 – $20 / ½ dz</div>
+      </div>
+
+      <div class="menu-card reveal">
+        <span class="menu-card-icon">🥖</span>
+        <div class="menu-card-name">Sourdough Loaf</div>
+        <div class="menu-card-sub">Sourdough</div>
+        <div class="menu-card-desc">Rustic, crusty sourdough loaves with a perfectly open crumb. Long-fermented for depth of flavor and that satisfying tang.</div>
+        <div class="menu-price">$11 – $14</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SPECIALTY -->
+<section id="specialty">
+  <div class="container" style="text-align:center">
+    <div class="reveal">
+      <div class="s-label" style="justify-content:center">Why Choose Us</div>
+      <h2 class="s-title">More Than Just a Bakery</h2>
+    </div>
+    <div class="spec-ring-wrap reveal-scale">
+      <div class="spec-ring"><div class="spec-ring-dot"></div></div>
+      <div class="spec-ring"><div class="spec-ring-dot"></div></div>
+      <div class="spec-ring"><div class="spec-ring-dot"></div></div>
+      <div class="spec-center">
+        <div class="spec-center-icon">🌸</div>
+        <div class="spec-center-text">Made with love</div>
+      </div>
+    </div>
+    <div class="spec-features">
+      <div class="spec-feat reveal"><span class="ico">🌾</span><h3>Local Ingredients</h3><p>Partnered with local farms for eggs, butter, and seasonal fruit.</p></div>
+      <div class="spec-feat reveal"><span class="ico">🎂</span><h3>Custom Orders</h3><p>Show-stopping cakes designed exactly to your vision.</p></div>
+      <div class="spec-feat reveal"><span class="ico">🌱</span><h3>Dietary Options</h3><p>Gluten-free, vegan, and nut-free options always available.</p></div>
+      <div class="spec-feat reveal"><span class="ico">☀️</span><h3>Fresh Daily</h3><p>Everything baked before sunrise. Always same-day fresh.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section id="testimonials">
+  <div style="text-align:center" class="reveal">
+    <div class="s-label" style="justify-content:center">Reviews</div>
+    <h2 class="s-title">Our Customers Love Us</h2>
+  </div>
+  <div class="testi-track-wrap">
+    <div class="testi-track">
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"Katie's croissants are absolutely life-changing. I drive 20 minutes every Saturday just to get one fresh out of the oven."</p><div class="testi-author">Sarah M. · Regular</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"Ordered a custom birthday cake — it was stunning AND delicious. So accommodating with our design requests."</p><div class="testi-author">Jessica R. · Custom Cake</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"The gluten-free options are incredible. This is the only bakery I trust for my dietary needs."</p><div class="testi-author">Michael T. · GF Customer</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"The almond croissant alone is worth the trip. Perfectly golden, not too sweet, impossibly flaky."</p><div class="testi-author">Amanda K. · Food Blogger</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"Every time I come in the staff remembers my name. The macarons are absolutely divine."</p><div class="testi-author">David L. · Local</div></div>
+      <!-- dupe for seamless loop -->
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"Katie's croissants are absolutely life-changing. I drive 20 minutes every Saturday just to get one fresh out of the oven."</p><div class="testi-author">Sarah M. · Regular</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"Ordered a custom birthday cake — it was stunning AND delicious. So accommodating with our design requests."</p><div class="testi-author">Jessica R. · Custom Cake</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"The gluten-free options are incredible. This is the only bakery I trust for my dietary needs."</p><div class="testi-author">Michael T. · GF Customer</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"The almond croissant alone is worth the trip. Perfectly golden, not too sweet, impossibly flaky."</p><div class="testi-author">Amanda K. · Food Blogger</div></div>
+      <div class="testi-card"><div class="testi-stars">★★★★★</div><p class="testi-text">"Every time I come in the staff remembers my name. The macarons are absolutely divine."</p><div class="testi-author">David L. · Local</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="container">
+    <div class="contact-grid">
+      <div class="reveal">
+        <div class="s-label">Find Us</div>
+        <h2 class="s-title">Come Visit</h2>
+        <p class="s-sub">We'd love to see you any day of the week.</p>
+        <div class="hours-grid">
+          <div class="hours-row"><span class="day">Monday – Friday</span><span class="time">7:00 AM – 6:00 PM</span></div>
+          <div class="hours-row"><span class="day">Saturday</span><span class="time">7:00 AM – 7:00 PM</span></div>
+          <div class="hours-row"><span class="day">Sunday</span><span class="time">8:00 AM – 4:00 PM</span></div>
+        </div>
+        <div class="contact-info-items">
+          <div class="c-item"><div class="c-icon">📍</div><p>142 Maple Street, Maplewood, NJ 07040</p></div>
+          <div class="c-item"><div class="c-icon">📞</div><p>(973) 555-0284</p></div>
+          <div class="c-item"><div class="c-icon">✉️</div><p>hello@sweetkatiestreats.com</p></div>
+        </div>
+      </div>
+      <div class="reveal" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;gap:2rem;padding:3rem 2rem;background:rgba(255,79,154,.04);border:1px solid rgba(255,79,154,.12);border-radius:24px;">
+        <div class="s-label" style="justify-content:center">Ready to Order?</div>
+        <h2 class="s-title" style="font-size:clamp(2.2rem,4vw,3.5rem);">Place Your Order<br />Online</h2>
+        <p class="s-sub" style="max-width:340px;">Custom cakes, pastries, and more — order directly through our Square store. Quick, easy, and secure.</p>
+        <a href="https://sweet-katies-treats.square.site/" target="_blank" class="btn-glow" style="font-size:1.1rem;padding:1.1rem 3rem;">Make an Order 🍰</a>
+        <p style="font-size:.75rem;color:rgba(255,255,255,.2);margin-top:-.5rem;">Opens our Square ordering page</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <img src="logo.jpg" alt="Sweet Katie's Treats" style="height:48px;width:auto;object-fit:contain;border-radius:8px;" />
+  <div class="footer-links">
+    <a href="#about">Story</a><a href="#menu">Menu</a><a href="#testimonials">Reviews</a><a href="#contact">Visit</a>
+  </div>
+  <div class="footer-copy">© 2024 Sweet Katie's Treats · Made with 🩷</div>
+</footer>
+
+<script>
+// ── SINGLE CANVAS: blobs + particles + cursor trail ──
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Soft blob definitions (drawn as radial gradients — no CSS filter needed)
+const BLOBS = [
+  { x: -0.15, y: -0.1,  r: 0.42, color: [244, 132, 156], speed: 0.00018, ox: 0, oy: 0 },
+  { x:  1.1,  y:  1.05, r: 0.38, color: [232, 160, 176], speed: 0.00013, ox: 0, oy: 0 },
+  { x:  0.65, y:  0.45, r: 0.28, color: [249, 192, 192], speed: 0.00022, ox: 0, oy: 0 },
+  { x:  0.2,  y:  0.7,  r: 0.22, color: [247, 214, 160], speed: 0.00016, ox: 0, oy: 0 },
+];
+
+// Particles — simple circles only, no text
+const PCOLS = [[244,132,156],[232,160,176],[249,192,192],[247,214,160],[255,182,193]];
+const PCOUNT = 55;
+const particles = [];
+class Particle {
+  constructor() { this.reset(true); }
+  reset(randomY) {
+    this.x = Math.random() * W;
+    this.y = randomY ? Math.random() * H : H + 10;
+    this.r = Math.random() * 2.2 + .5;
+    this.vy = -(Math.random() * .4 + .15);
+    this.vx = (Math.random() - .5) * .25;
+    this.alpha = 0;
+    this.maxAlpha = Math.random() * .45 + .1;
+    this.life = 0;
+    this.maxLife = Math.random() * 280 + 120;
+    this.col = PCOLS[Math.floor(Math.random() * PCOLS.length)];
+  }
+  update() {
+    this.life++;
+    this.x += this.vx; this.y += this.vy;
+    const p = this.life / this.maxLife;
+    this.alpha = p < .1 ? p / .1 * this.maxAlpha
+               : p > .8 ? (1 - (p - .8) / .2) * this.maxAlpha
+               : this.maxAlpha;
+    if (this.life >= this.maxLife) this.reset(false);
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${this.col[0]},${this.col[1]},${this.col[2]},${this.alpha})`;
+    ctx.fill();
+  }
+}
+for (let i = 0; i < PCOUNT; i++) {
+  const p = new Particle();
+  p.life = Math.floor(Math.random() * p.maxLife);
+  particles.push(p);
+}
+
+// Cursor trail — small circles drawn on canvas
+const trail = [];
+let mx = W / 2, my = H / 2;
+
+function drawFrame(ts) {
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw blobs as large radial gradients (GPU fast, no CSS filter)
+  BLOBS.forEach(b => {
+    const cx = (b.x + Math.sin(ts * b.speed * 1.1) * .06) * W;
+    const cy = (b.y + Math.cos(ts * b.speed) * .07) * H;
+    const rad = b.r * Math.max(W, H);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    g.addColorStop(0, `rgba(${b.color[0]},${b.color[1]},${b.color[2]},.18)`);
+    g.addColorStop(1, `rgba(${b.color[0]},${b.color[1]},${b.color[2]},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Cursor trail
+  for (let i = trail.length - 1; i >= 0; i--) {
+    const t = trail[i];
+    t.life -= 2.5;
+    if (t.life <= 0) { trail.splice(i, 1); continue; }
+    const a = (t.life / t.maxLife) * .55;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r * (t.life / t.maxLife), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${t.col[0]},${t.col[1]},${t.col[2]},${a})`;
+    ctx.fill();
+  }
+
+  // Particles
+  particles.forEach(p => { p.update(); p.draw(); });
+
+  requestAnimationFrame(drawFrame);
+}
+requestAnimationFrame(drawFrame);
+
+// ── CURSOR ──
+const cursorEl = document.getElementById('cursor');
+const ringEl   = document.getElementById('cursor-ring');
+let rx = 0, ry = 0, frameCount = 0;
+const trailCols = [[244,132,156],[232,160,176],[247,214,160],[249,192,192]];
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursorEl.style.left = mx + 'px';
+  cursorEl.style.top  = my + 'px';
+  frameCount++;
+  if (frameCount % 3 === 0) { // throttle trail
+    const col = trailCols[Math.floor(Math.random() * trailCols.length)];
+    trail.push({ x: mx, y: my, r: Math.random() * 5 + 2, life: 60, maxLife: 60, col });
+  }
+});
+
+(function lerpRing() {
+  rx += (mx - rx) * .13;
+  ry += (my - ry) * .13;
+  ringEl.style.left = rx + 'px';
+  ringEl.style.top  = ry + 'px';
+  requestAnimationFrame(lerpRing);
+})();
+
+// ── NAV ──
+window.addEventListener('scroll', () =>
+  document.getElementById('nav').classList.toggle('scrolled', scrollY > 60)
+);
+
+// ── TYPEWRITER ──
+const words = ['Custom Cakes.','Fudgy Brownies.','Specialty Cupcakes.','Chewy Cookies.','Cinnamon Rolls.','Cake Pops.','Fresh Sourdough.'];
+let wi = 0, ci = 0, deleting = false;
+const tw = document.getElementById('typewriter');
+function type() {
+  const word = words[wi];
+  if (!deleting) {
+    tw.textContent = word.slice(0, ++ci);
+    if (ci === word.length) { deleting = true; setTimeout(type, 1800); return; }
+  } else {
+    tw.textContent = word.slice(0, --ci);
+    if (ci === 0) { deleting = false; wi = (wi + 1) % words.length; setTimeout(type, 300); return; }
+  }
+  setTimeout(type, deleting ? 50 : 85);
+}
+type();
+
+// ── REVEAL ON SCROLL ──
+const revEls = document.querySelectorAll('.reveal, .reveal-scale');
+const ro = new IntersectionObserver(entries => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('vis'), i * 90);
+      ro.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+revEls.forEach(el => ro.observe(el));
+
+// ── COUNTER ANIMATION ──
+function animCount(el, target) {
+  let v = 0;
+  const step = target / (1600 / 16);
+  const suffix = target === 100 ? '%' : '+';
+  const t = setInterval(() => {
+    v = Math.min(v + step, target);
+    el.textContent = (target > 999 ? Math.floor(v).toLocaleString() : Math.floor(v)) + suffix;
+    if (v >= target) clearInterval(t);
+  }, 16);
+}
+const statsObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.stat-num').forEach(el => animCount(el, +el.dataset.target));
+      statsObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.4 });
+const statsEl = document.querySelector('.about-stats');
+if (statsEl) statsObs.observe(statsEl);
+
+// ── 3D CARD TILT ──
+document.querySelectorAll('.menu-card').forEach(card => {
+  card.addEventListener('mousemove', e => {
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width  - .5;
+    const y = (e.clientY - r.top)  / r.height - .5;
+    card.style.transform = `perspective(600px) rotateX(${-y*10}deg) rotateY(${x*10}deg) translateY(-6px)`;
+  });
+  card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+});
+
+// ── FORM ──
+function submitForm(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = '✅ Message Sent!';
+  btn.style.background = 'linear-gradient(135deg,#2ecc71,#00b894)';
+  setTimeout(() => { btn.textContent = 'Send Message 🍰'; btn.style.background = ''; }, 3000);
+}
+</script>
+</body>
+</html>
